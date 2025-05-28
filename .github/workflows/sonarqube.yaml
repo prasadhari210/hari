@@ -1,4 +1,4 @@
-name: Install SonarQube and Run Scanner
+name: Start SonarQube
 
 on:
   workflow_dispatch:
@@ -16,36 +16,19 @@ jobs:
           --health-cmd="curl --fail http://localhost:9000/api/system/health || exit 1"
           --health-interval=10s
           --health-timeout=5s
-          --health-retries=20
+          --health-retries=30
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Wait for SonarQube to be ready
         run: |
           for i in {1..30}; do
             status=$(curl -s http://localhost:9000/api/system/status | jq -r .status)
             if [ "$status" = "UP" ]; then
               echo "✅ SonarQube is ready"
-              break
+              exit 0
             fi
-            echo "⏳ Waiting for SonarQube to be ready..."
+            echo "⏳ Waiting for SonarQube..."
             sleep 10
           done
-
-      - name: Install SonarScanner CLI
-        run: |
-          wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
-          unzip sonar-scanner-cli-*.zip
-          mv sonar-scanner-* sonar-scanner
-          echo "$(pwd)/sonar-scanner/bin" >> $GITHUB_PATH
-
-      - name: Run SonarScanner with default credentials
-        run: |
-          sonar-scanner \
-            -Dsonar.projectKey=my-project \
-            -Dsonar.sources=. \
-            -Dsonar.host.url=http://localhost:9000 \
-            -Dsonar.login=admin \
-            -Dsonar.password=admin
+          echo "❌ SonarQube did not become ready in time"
+          exit 1

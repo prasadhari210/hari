@@ -1,10 +1,7 @@
 name: Install SonarQube and Run Scanner
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-
+  workflow_dispatch:
 jobs:
   sonarqube:
     runs-on: ubuntu-latest

@@ -17,3 +17,9 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=30
+
+    steps:
+      - name: Wait for SonarQube to be ready
+        run: |
+          echo "❌ SonarQube did not become ready in time"
+          exit 1

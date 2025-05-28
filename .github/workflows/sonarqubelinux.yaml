@@ -1,0 +1,33 @@
+name: Install SonarQube on Ubuntu
+
+on:
+  workflow_dispatch:
+
+jobs:
+  install-sonarqube:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install unzip and wget
+        run: sudo apt-get update && sudo apt-get install -y unzip wget
+
+      - name: Download and extract SonarQube
+        run: |
+          wget https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-10.4.1.88267.zip
+          unzip sonarqube-10.4.1.88267.zip -d $HOME/sonarqube
+
+      - name: Start SonarQube
+        run: |
+          cd $HOME/sonarqube/sonarqube-10.4.1.88267/bin/linux-x86-64
+          ./sonar.sh start
+          sleep 60  # Wait for SonarQube to initialize
+
+      - name: Check SonarQube Status
+        run: |
+          curl http://localhost:9000/api/system/status

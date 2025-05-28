@@ -1,25 +1,31 @@
-name: Start SonarQube
+name: Install SonarQube on Windows
 
 on:
   workflow_dispatch:
 
 jobs:
-  sonarqube:
-    runs-on: ubuntu-latest
-
-    services:
-      sonarqube:
-        image: sonarqube:community
-        ports:
-          - 9000:9000
-        options: >-
-          --health-cmd="curl --fail http://localhost:9000/api/system/health || exit 1"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=30
+  install-sonarqube:
+    runs-on: windows-latest
 
     steps:
-      - name: Wait for SonarQube to be ready
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Download SonarQube
         run: |
-          echo "❌ SonarQube did not become ready in time"
-          exit 1
+          Invoke-WebRequest -Uri "https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-10.4.1.88267.zip" -OutFile "sonarqube.zip"
+          Expand-Archive sonarqube.zip -DestinationPath "$env:USERPROFILE\sonarqube"
+
+      - name: Start SonarQube
+        run: |
+          cd "$env:USERPROFILE\sonarqube\sonarqube-10.4.1.88267\bin\windows-x86-64"
+          Start-Process -FilePath StartSonar.bat
+          Start-Sleep -Seconds 60  # wait for server to initialize
+
+      - name: Check SonarQube Status
+        run: |
+          $status = Invoke-RestMethod -Uri http://localhost:9000/api/system/status
+          Write-Host "SonarQube status: $($status.status)"

@@ -1,0 +1,86 @@
+name: Deploy SonarQube in Kubernetes
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy-sonarqube:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Kubernetes with Kind
+        uses: helm/kind-action@v1.5.0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.12.3
+
+      - name: Add Helm Repositories
+        run: |
+          helm repo add sonarqube https://SonarSource.github.io/helm-chart-sonarqube
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm repo update
+
+      - name: Deploy PostgreSQL
+        run: |
+          helm install sonarqube-postgresql bitnami/postgresql \
+            --set auth.postgresPassword=sonarpass \
+            --set auth.username=sonar \
+            --set auth.password=sonarpass \
+            --set auth.database=sonarqube
+
+      - name: Wait for PostgreSQL Ready
+        run: |
+          kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=postgresql --timeout=180s
+
+      - name: Create SonarQube License Secret (optional)
+        if: ${{ secrets.SONARQUBE_LICENSE != '' }}
+        run: |
+          kubectl create secret generic sonarqube-license \
+            --from-literal=SONARQUBE_LICENSE="${{ secrets.SONARQUBE_LICENSE }}"
+
+      - name: Deploy SonarQube Enterprise
+        run: |
+          cat <<EOF > values.yaml
+          sonarqube:
+            image:
+              repository: sonarqube
+              tag: 9.9.6-enterprise
+            edition: enterprise
+            jdbcOverwrite:
+              enable: true
+              url: jdbc:postgresql://sonarqube-postgresql:5432/sonarqube
+              username: sonar
+              password: sonarpass
+            initSysctl:
+              enabled: true
+            resources:
+              limits:
+                cpu: "2"
+                memory: "4Gi"
+              requests:
+                cpu: "1"
+                memory: "2Gi"
+            env:
+              - name: SONARQUBE_LICENSE
+                valueFrom:
+                  secretKeyRef:
+                    name: sonarqube-license
+                    key: SONARQUBE_LICENSE
+          EOF
+
+          helm install sonarqube sonarqube/sonarqube -f values.yaml
+
+      - name: Wait for SonarQube Ready
+        run: |
+          kubectl wait --for=condition=Available deployment/sonarqube-sonarqube --timeout=300s
+
+      - name: Port Forward and Health Check
+        run: |
+          kubectl port-forward svc/sonarqube-sonarqube 9000:9000 &
+          sleep 30
+          curl -I http://localhost:9000

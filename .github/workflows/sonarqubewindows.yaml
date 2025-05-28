@@ -14,10 +14,11 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Download SonarQube
+      - name: Download SonarQube Zip
+        shell: pwsh
         run: |
-          Invoke-WebRequest -Uri "https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-10.4.1.88267.zip" -OutFile "sonarqube.zip"
-          Expand-Archive sonarqube.zip -DestinationPath "$env:USERPROFILE\sonarqube"
+         Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+         Invoke-WebRequest -Uri "https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-10.4.1.88267.zip" -OutFile "sonarqube.zip"
 
       - name: Start SonarQube
         run: |

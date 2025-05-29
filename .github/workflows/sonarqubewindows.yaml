@@ -5,28 +5,33 @@ on:
 
 jobs:
   install-sonarqube:
-    runs-on: self-hosted
+    runs-on: windows-latest
 
     steps:
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Download SonarQube Zip
+      - name: Download and Extract SonarQube
         shell: powershell
         run: |
-         Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
-         Invoke-WebRequest -Uri "https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-10.4.1.88267.zip" -OutFile "sonarqube.zip"
+          $ErrorActionPreference = "Stop"
 
-      - name: Start SonarQube
-        run: |
-          cd "$env:USERPROFILE\sonarqube\sonarqube-10.4.1.88267\bin\windows-x86-64"
-          Start-Process -FilePath StartSonar.bat
-          Start-Sleep -Seconds 60  # wait for server to initialize
+          # Create directory if not exists
+          $destinationPath = "$env:USERPROFILE\sonarqube"
+          if (!(Test-Path $destinationPath)) {
+            New-Item -ItemType Directory -Path $destinationPath | Out-Null
+          }
 
-      - name: Check SonarQube Status
-        run: |
-          $status = Invoke-RestMethod -Uri http://localhost:9000/api/system/status
-          Write-Host "SonarQube status: $($status.status)"
+          # Download
+          $zipPath = "$destinationPath\sonarqube.zip"
+          Invoke-WebRequest -Uri "https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-10.4.1.88267.zip" -OutFile $zipPath
+
+          # Extract
+          Expand-Archive -Path $zipPath -DestinationPath $destinationPath -Force
+
+          # Verify and navigate to extracted directory
+          $sonarBinPath = Join-Path $destinationPath "sonarqube-10.4.1.88267\bin\windows-x86-64"
+          if (!(Test-Path $sonarBinPath)) {
+            Write-Error "SonarQube binary path not found: $sonarBinPath"
+            exit 1
+          }
+
+          Set-Location $sonarBinPath
+          Start-Process -FilePath ".\StartSonar.bat"
